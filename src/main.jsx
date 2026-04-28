@@ -8,7 +8,7 @@ import './styles/index.css';
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ThemeProvider>
-      <BrowserRouter basename="/Web6">
+      <BrowserRouter basename="/tum-web-lab-6">
         <App />
       </BrowserRouter>
     </ThemeProvider>
