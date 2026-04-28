@@ -65,11 +65,20 @@ function removeFrom(listName, appid) {
   persist({ ...cache, [listName]: list.filter((g) => g.appid !== appid) });
 }
 
-function moveToHistory(appid) {
+function moveToHistory(appid, payload = {}) {
   const list = cache.planner;
   const index = list.findIndex((g) => g.appid === appid);
   if (index === -1) return;
-  const game = { ...list[index], completedDate: Date.now() };
+  const planned = list[index];
+  const playedAt =
+    payload.playedAt ?? (planned.notificationDateTime ? new Date(planned.notificationDateTime).getTime() : Date.now());
+  const durationMinutes = Number.isFinite(payload.durationMinutes) ? payload.durationMinutes : 60;
+  const game = {
+    ...planned,
+    completedDate: playedAt,
+    playedAt,
+    durationMinutes,
+  };
   const newPlanner = list.filter((g) => g.appid !== appid);
   persist({ ...cache, planner: newPlanner, history: [...cache.history, game] });
 }
@@ -102,6 +111,6 @@ export function useGameLists() {
     removeFromWishlist: (appid) => removeFrom('wishlist', appid),
     updatePlannerGame: (appid, updates) => updateInList('planner', appid, updates),
     updateWishlistGame: (appid, updates) => updateInList('wishlist', appid, updates),
-    markGameAsPlayed: (appid) => moveToHistory(appid),
+    markGameAsPlayed: (appid, payload) => moveToHistory(appid, payload),
   };
 }
