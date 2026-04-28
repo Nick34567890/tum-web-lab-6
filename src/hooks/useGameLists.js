@@ -40,8 +40,20 @@ function upsert(listName, game) {
     name: game.name,
     developer: game.developer || '',
     addedAt: Date.now(),
+    notificationDateTime: null,
+    wantToBuy: false,
   };
   persist({ ...cache, [listName]: [...list, entry] });
+}
+
+function updateInList(listName, appid, updates) {
+  const list = cache[listName];
+  const index = list.findIndex((g) => g.appid === appid);
+  if (index === -1) return;
+  const updated = { ...list[index], ...updates };
+  const newList = [...list];
+  newList[index] = updated;
+  persist({ ...cache, [listName]: newList });
 }
 
 function removeFrom(listName, appid) {
@@ -75,5 +87,7 @@ export function useGameLists() {
     removeFromLibrary: (appid) => removeFrom('library', appid),
     removeFromPlanner: (appid) => removeFrom('planner', appid),
     removeFromWishlist: (appid) => removeFrom('wishlist', appid),
+    updatePlannerGame: (appid, updates) => updateInList('planner', appid, updates),
+    updateWishlistGame: (appid, updates) => updateInList('wishlist', appid, updates),
   };
 }

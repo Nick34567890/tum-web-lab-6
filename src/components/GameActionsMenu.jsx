@@ -4,6 +4,7 @@ import { useGameLists } from '../hooks/useGameLists.js';
 
 export default function GameActionsMenu({ game }) {
   const [open, setOpen] = useState(false);
+  const [buyPromptOpen, setBuyPromptOpen] = useState(false);
   const wrapRef = useRef(null);
   const navigate = useNavigate();
   const {
@@ -40,9 +41,33 @@ export default function GameActionsMenu({ game }) {
 
   const handleLibrary = (e) => {
     stop(e);
-    if (!isInLibrary) addToLibrary(game);
+    if (isInLibrary) {
+      setOpen(false);
+      navigate('/library');
+      return;
+    }
+
+    if (game.isFree) {
+      addToLibrary(game);
+      setOpen(false);
+      navigate('/library');
+      return;
+    }
+
+    setBuyPromptOpen(true);
     setOpen(false);
+  };
+
+  const handleBuyNow = () => {
+    addToLibrary(game);
+    setBuyPromptOpen(false);
     navigate('/library');
+  };
+
+  const handlePlanToBuy = () => {
+    if (!isInWishlist) addToWishlist(game);
+    setBuyPromptOpen(false);
+    navigate('/planner');
   };
 
   const handleWishlist = (e) => {
@@ -53,9 +78,11 @@ export default function GameActionsMenu({ game }) {
 
   const handlePlanner = (e) => {
     stop(e);
-    if (!isInPlanner) addToPlanner(game);
-    setOpen(false);
-    navigate('/planner');
+    if (!isInPlanner && isInLibrary) {
+      addToPlanner(game);
+      setOpen(false);
+      navigate('/planner');
+    }
   };
 
   return (
@@ -80,9 +107,9 @@ export default function GameActionsMenu({ game }) {
             disabled={isInLibrary}
             onClick={handleLibrary}
             label={isInLibrary ? '✓ In your library' : 'Add to library'}
-            hint={isInLibrary ? undefined : 'Opens Library'}
+            hint={isInLibrary ? undefined : game.isFree ? 'FREE - Add now' : 'Own this game'}
           />
-          {!game.isFree && (
+          {!game.isFree && !isInLibrary && (
             <MenuItem
               disabled={isInWishlist}
               onClick={handleWishlist}
@@ -91,11 +118,59 @@ export default function GameActionsMenu({ game }) {
             />
           )}
           <MenuItem
-            disabled={isInPlanner}
+            disabled={isInPlanner || !isInLibrary}
             onClick={handlePlanner}
             label={isInPlanner ? '✓ Plan to play' : 'Plan to play'}
-            hint={isInPlanner ? undefined : 'Opens Planner'}
+            hint={
+              isInPlanner
+                ? undefined
+                : !isInLibrary
+                ? '⚠️ Add to library first'
+                : 'Opens Planner'
+            }
           />
+        </div>
+      )}
+      {buyPromptOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose purchase option"
+            className="w-full max-w-sm rounded-xl border border-border bg-surface p-4 shadow-2xl space-y-4"
+            onClick={stop}
+          >
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">{game.name}</h3>
+              <p className="text-sm text-muted mt-1">
+                This game is paid. Choose how you want to add it.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Buy right now
+              </button>
+              <button
+                type="button"
+                onClick={handlePlanToBuy}
+                className="w-full rounded-lg border border-border bg-surface2 px-4 py-2.5 text-sm font-medium text-text hover:bg-surface3"
+              >
+                Plan to buy
+              </button>
+              <button
+                type="button"
+                onClick={() => setBuyPromptOpen(false)}
+                className="w-full rounded-lg px-4 py-2 text-sm font-medium text-muted hover:text-text"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
