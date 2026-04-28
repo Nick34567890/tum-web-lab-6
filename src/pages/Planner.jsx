@@ -7,7 +7,7 @@ import { GameEditModal } from '../components/GameEditModal.jsx';
 import { NotificationCenter } from '../components/NotificationCenter.jsx';
 
 export default function Planner() {
-  const { library, planner, wishlist, removeFromPlanner, removeFromWishlist, updatePlannerGame, updateWishlistGame, inLibrary } = useGameLists();
+  const { library, planner, wishlist, removeFromPlanner, removeFromWishlist, updatePlannerGame, updateWishlistGame, inLibrary, markGameAsPlayed } = useGameLists();
   const { notifications, addNotification, removeNotification } = useNotification();
   const [editingGame, setEditingGame] = useState(null);
   const [editingListType, setEditingListType] = useState(null);
@@ -51,6 +51,7 @@ export default function Planner() {
         items={planner}
         onRemove={removeFromPlanner}
         onEdit={(game) => handleEdit(game, 'planner')}
+        onDone={markGameAsPlayed}
         emptyHint='Add games here from the Dashboard ⋮ → "Plan to play".'
       />
 
@@ -77,7 +78,7 @@ export default function Planner() {
   );
 }
 
-function Section({ title, items, onRemove, onEdit, emptyHint }) {
+function Section({ title, items, onRemove, onEdit, onDone, emptyHint }) {
   return (
     <section className="space-y-3">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
@@ -131,6 +132,15 @@ function Section({ title, items, onRemove, onEdit, emptyHint }) {
                   >
                     Edit
                   </button>
+                  {title === 'Plan to play' && onDone && (
+                    <button
+                      type="button"
+                      onClick={() => onDone(g.appid)}
+                      className="flex-1 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded transition"
+                    >
+                      Done
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onRemove(g.appid)}
