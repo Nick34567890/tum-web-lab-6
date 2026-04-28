@@ -1,8 +1,33 @@
+import { useState } from 'react';
 import { useGameLists } from '../hooks/useGameLists.js';
 import { steamHeader, steamStorePage } from '../data/fallbackTopGames.js';
 
 export default function Library() {
-  const { library, removeFromLibrary } = useGameLists();
+  const { library, planner, removeFromLibrary, addToPlanner, updatePlannerGame, inPlanner } = useGameLists();
+  const [scheduleGame, setScheduleGame] = useState(null);
+  const [scheduledDateTime, setScheduledDateTime] = useState('');
+
+  const openSchedule = (game) => {
+    setScheduleGame(game);
+    const plannedGame = planner.find((item) => item.appid === game.appid);
+    setScheduledDateTime(plannedGame?.notificationDateTime || game.notificationDateTime || '');
+  };
+
+  const saveSchedule = () => {
+    if (!scheduleGame) return;
+    const nextValues = {
+      notificationDateTime: scheduledDateTime || null,
+      wantToBuy: false,
+    };
+
+    if (inPlanner(scheduleGame.appid)) {
+      updatePlannerGame(scheduleGame.appid, nextValues);
+    } else {
+      addToPlanner(scheduleGame, nextValues);
+    }
+    setScheduleGame(null);
+    setScheduledDateTime('');
+  };
 
   return (
     <div className="space-y-6">
@@ -24,8 +49,19 @@ export default function Library() {
           {library.map((g) => (
             <div
               key={g.appid}
-              className="rounded-lg border border-border bg-surface overflow-hidden flex"
+              className="rounded-lg border border-border bg-surface overflow-hidden flex relative"
             >
+              <button
+                type="button"
+                onClick={() => openSchedule(g)}
+                className={`absolute top-2 right-2 z-10 rounded-md px-2 py-1 text-[10px] font-semibold shadow-md transition ${
+                  inPlanner(g.appid)
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {inPlanner(g.appid) ? '✓ Planned' : 'Plan play'}
+              </button>
               <a
                 href={steamStorePage(g.appid)}
                 target="_blank"
@@ -53,6 +89,44 @@ export default function Library() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {scheduleGame && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-2xl space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">Plan play time</h3>
+              <p className="text-sm text-muted mt-1">{scheduleGame.name}</p>
+            </div>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">Select date and time</span>
+              <input
+                type="datetime-local"
+                value={scheduledDateTime}
+                onChange={(e) => setScheduledDateTime(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface2 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </label>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={saveSchedule}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Save to Planner
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleGame(null)}
+                className="flex-1 rounded-lg border border-border bg-surface2 px-4 py-2.5 text-sm font-medium text-text hover:bg-surface3"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

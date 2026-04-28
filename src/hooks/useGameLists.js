@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 const KEY = 'gat-lists-v1';
 
-const empty = () => ({ library: [], planner: [], wishlist: [] });
+const empty = () => ({ library: [], planner: [], wishlist: [], history: [] });
 
 function read() {
   try {
@@ -13,6 +13,7 @@ function read() {
       library: Array.isArray(parsed.library) ? parsed.library : [],
       planner: Array.isArray(parsed.planner) ? parsed.planner : [],
       wishlist: Array.isArray(parsed.wishlist) ? parsed.wishlist : [],
+      history: Array.isArray(parsed.history) ? parsed.history : [],
     };
   } catch {
     return empty();
@@ -32,7 +33,7 @@ function persist(next) {
   notify();
 }
 
-function upsert(listName, game) {
+function upsert(listName, game, overrides = {}) {
   const list = cache[listName];
   if (list.some((g) => g.appid === game.appid)) return;
   const entry = {
@@ -42,6 +43,8 @@ function upsert(listName, game) {
     addedAt: Date.now(),
     notificationDateTime: null,
     wantToBuy: false,
+    completedDate: null,
+    ...overrides,
   };
   persist({ ...cache, [listName]: [...list, entry] });
 }
@@ -62,6 +65,15 @@ function removeFrom(listName, appid) {
   persist({ ...cache, [listName]: list.filter((g) => g.appid !== appid) });
 }
 
+function moveToHistory(appid) {
+  const list = cache.planner;
+  const index = list.findIndex((g) => g.appid === appid);
+  if (index === -1) return;
+  const game = { ...list[index], completedDate: Date.now() };
+  const newPlanner = list.filter((g) => g.appid !== appid);
+  persist({ ...cache, planner: newPlanner, history: [...cache.history, game] });
+}
+
 export function useGameLists() {
   const [state, setState] = useState(cache);
 
@@ -78,16 +90,18 @@ export function useGameLists() {
     library: state.library,
     planner: state.planner,
     wishlist: state.wishlist,
+    history: state.history,
     inLibrary,
     inPlanner,
     inWishlist,
-    addToLibrary: (game) => upsert('library', game),
-    addToPlanner: (game) => upsert('planner', game),
-    addToWishlist: (game) => upsert('wishlist', game),
+    addToLibrary: (game, overrides) => upsert('library', game, overrides),
+    addToPlanner: (game, overrides) => upsert('planner', game, overrides),
+    addToWishlist: (game, overrides) => upsert('wishlist', game, overrides),
     removeFromLibrary: (appid) => removeFrom('library', appid),
     removeFromPlanner: (appid) => removeFrom('planner', appid),
     removeFromWishlist: (appid) => removeFrom('wishlist', appid),
     updatePlannerGame: (appid, updates) => updateInList('planner', appid, updates),
     updateWishlistGame: (appid, updates) => updateInList('wishlist', appid, updates),
+    markGameAsPlayed: (appid) => moveToHistory(appid),
   };
 }
