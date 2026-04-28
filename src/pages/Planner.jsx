@@ -5,12 +5,15 @@ import { useNotificationChecker } from '../hooks/useNotificationChecker.js';
 import { steamHeader, steamStorePage } from '../data/fallbackTopGames.js';
 import { GameEditModal } from '../components/GameEditModal.jsx';
 import { NotificationCenter } from '../components/NotificationCenter.jsx';
+import MarkPlayedModal from '../components/MarkPlayedModal.jsx';
 
 export default function Planner() {
-  const { library, planner, wishlist, removeFromPlanner, removeFromWishlist, updatePlannerGame, updateWishlistGame, inLibrary, markGameAsPlayed } = useGameLists();
+  const { library, planner, wishlist, removeFromPlanner, removeFromWishlist, updatePlannerGame, updateWishlistGame, inLibrary, addToLibrary, markGameAsPlayed } = useGameLists();
   const { notifications, addNotification, removeNotification } = useNotification();
   const [editingGame, setEditingGame] = useState(null);
   const [editingListType, setEditingListType] = useState(null);
+  const [donePromptGame, setDonePromptGame] = useState(null);
+  const [buyPromptGame, setBuyPromptGame] = useState(null);
 
   const handlePlayNotification = useCallback((game) => {
     addNotification(`Time to play ${game.name}! 🎮`, 'success', 8000);
@@ -51,7 +54,7 @@ export default function Planner() {
         items={planner}
         onRemove={removeFromPlanner}
         onEdit={(game) => handleEdit(game, 'planner')}
-        onDone={markGameAsPlayed}
+        onDone={(game) => setDonePromptGame(game)}
         emptyHint='Add games here from the Dashboard ⋮ → "Plan to play".'
       />
 
@@ -60,6 +63,7 @@ export default function Planner() {
         items={wishlist}
         onRemove={removeFromWishlist}
         onEdit={(game) => handleEdit(game, 'wishlist')}
+        onBuy={(game) => setBuyPromptGame(game)}
         emptyHint='Paid games can be added from the Dashboard ⋮ → "Plan to buy".'
       />
 
@@ -73,12 +77,39 @@ export default function Planner() {
         />
       )}
 
+      {donePromptGame && (
+        <MarkPlayedModal
+          game={donePromptGame}
+          onClose={() => setDonePromptGame(null)}
+          onSave={(payload) => {
+            markGameAsPlayed(donePromptGame.appid, payload);
+            const hours = (payload.durationMinutes / 60).toFixed(1);
+            addNotification(`Logged ${hours}h of ${donePromptGame.name}!`, 'success', 4000);
+            setDonePromptGame(null);
+          }}
+        />
+      )}
+
+      {buyPromptGame && (
+        <BuyConfirmModal
+          game={buyPromptGame}
+          onCancel={() => setBuyPromptGame(null)}
+          onConfirm={() => {
+            window.open(steamStorePage(buyPromptGame.appid), '_blank', 'noopener,noreferrer');
+            if (!inLibrary(buyPromptGame.appid)) addToLibrary(buyPromptGame);
+            removeFromWishlist(buyPromptGame.appid);
+            addNotification(`Opened Steam to buy ${buyPromptGame.name}`, 'success', 4000);
+            setBuyPromptGame(null);
+          }}
+        />
+      )}
+
       <NotificationCenter notifications={notifications} onRemove={removeNotification} />
     </div>
   );
 }
 
-function Section({ title, items, onRemove, onEdit, onDone, emptyHint }) {
+function Section({ title, items, onRemove, onEdit, onDone, onBuy, emptyHint }) {
   return (
     <section className="space-y-3">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
@@ -135,10 +166,19 @@ function Section({ title, items, onRemove, onEdit, onDone, emptyHint }) {
                   {title === 'Plan to play' && onDone && (
                     <button
                       type="button"
-                      onClick={() => onDone(g.appid)}
+                      onClick={() => onDone(g)}
                       className="flex-1 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded transition"
                     >
                       Done
+                    </button>
+                  )}
+                  {title === 'Plan to buy' && onBuy && (
+                    <button
+                      type="button"
+                      onClick={() => onBuy(g)}
+                      className="flex-1 text-[11px] bg-amber-500 hover:bg-amber-600 text-white px-2 py-1.5 rounded transition"
+                    >
+                      Buy
                     </button>
                   )}
                   <button
@@ -155,5 +195,48 @@ function Section({ title, items, onRemove, onEdit, onDone, emptyHint }) {
         </div>
       )}
     </section>
+  );
+}
+
+function BuyConfirmModal({ game, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-2xl space-y-4">
+        <div className="flex items-center gap-3">
+          <img
+            src={steamHeader(game.appid)}
+            alt={game.name}
+            className="w-20 h-10 object-cover rounded"
+          />
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold tracking-tight truncate">{game.name}</h3>
+            <p className="text-xs text-muted truncate">{game.developer}</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted">
+          This will open the Steam store page for{' '}
+          <span className="text-text font-medium">{game.name}</span> in a new tab and move it from
+          your wishlist into your library.
+        </p>
+
+        <div className="flex gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 rounded-lg bg-amber-500 hover:bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Buy the game
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-lg border border-border bg-surface2 px-4 py-2.5 text-sm font-medium text-text hover:bg-surface"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
