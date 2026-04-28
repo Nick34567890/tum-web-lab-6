@@ -85,19 +85,6 @@ No API key is required; the app is fully client-side.
 - **localStorage** for persistence (no backend)
 - **gh-pages** for one-command deploy to GitHub Pages
 
-## Running Locally
+## Link
 
-```bash
-npm install
-npm run dev
-```
-
-The app runs at `http://localhost:5173/Web6/`.
-
-## Deploying to GitHub Pages
-
-```bash
-npm run deploy
-```
-
-This builds the app and pushes the `dist/` folder to the `gh-pages` branch. Make sure `base` in [`vite.config.js`](vite.config.js), `basename` in [`src/main.jsx`](src/main.jsx), and `homepage` in [`package.json`](package.json) all match your repository name.
+https://nick34567890.github.io/tum-web-lab-6/
