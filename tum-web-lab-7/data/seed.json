@@ -1,0 +1,24 @@
+{
+  "library": [
+    { "appid": 730, "name": "Counter-Strike 2", "developer": "Valve", "addedAt": 1730000000000 }
+  ],
+  "planner": [
+    {
+      "appid": 1086940,
+      "name": "Baldur's Gate 3",
+      "developer": "Larian Studios",
+      "addedAt": 1730000000000,
+      "notificationDateTime": "2026-06-01T20:00"
+    }
+  ],
+  "wishlist": [
+    {
+      "appid": 1245620,
+      "name": "ELDEN RING",
+      "developer": "FromSoftware",
+      "addedAt": 1730000000000,
+      "wantToBuy": true
+    }
+  ],
+  "history": []
+}
