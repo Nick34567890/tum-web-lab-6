@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { fetchTopGames } from '../api/steam.js';
+import { useSearchParams } from 'react-router-dom';
+import { fetchDashboardPage } from '../api/steam.js';
 import { steamHeader, steamStorePage } from '../data/fallbackTopGames.js';
 import GameActionsMenu from './GameActionsMenu.jsx';
 
@@ -60,26 +61,88 @@ function GameTile({ game, rank }) {
   );
 }
 
-export default function SteamTopGames({ limit = 50 }) {
-  const [state, setState] = useState({ status: 'loading', games: [], source: null, error: null });
+function PageButton({ children, disabled, active, onClick, title }) {
+  const base = 'min-w-[2rem] px-2.5 py-1 rounded-md text-sm font-medium transition border';
+  const cls = active
+    ? `${base} bg-accent text-white border-accent`
+    : disabled
+    ? `${base} bg-surface text-muted border-border opacity-50 cursor-not-allowed`
+    : `${base} bg-surface text-text border-border hover:border-accent hover:bg-surface2`;
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={cls} title={title}>
+      {children}
+    </button>
+  );
+}
+
+function Paginator({ page, hasMore, onChange }) {
+  const around = [page - 2, page - 1, page, page + 1, page + 2].filter((n) => n >= 1);
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <PageButton onClick={() => onChange(1)} disabled={page === 1} title="First page">
+        «
+      </PageButton>
+      <PageButton onClick={() => onChange(page - 1)} disabled={page === 1} title="Previous page">
+        ‹ Prev
+      </PageButton>
+
+      {around[0] > 1 && <span className="text-muted px-1">…</span>}
+      {around.map((n) => (
+        <PageButton key={n} active={n === page} onClick={() => onChange(n)}>
+          {n}
+        </PageButton>
+      ))}
+      {hasMore && <span className="text-muted px-1">…</span>}
+
+      <PageButton onClick={() => onChange(page + 1)} disabled={!hasMore} title="Next page">
+        Next ›
+      </PageButton>
+    </div>
+  );
+}
+
+export default function SteamTopGames({ pageSize = 50 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialPage = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1', 10) || 1);
+  const [page, setPage] = useState(initialPage);
+  const [state, setState] = useState({ status: 'loading', games: [], source: null, error: null, hasMore: false });
 
   useEffect(() => {
     let cancelled = false;
     setState((s) => ({ ...s, status: 'loading' }));
-    fetchTopGames(limit).then((res) => {
+    fetchDashboardPage(page, pageSize).then((res) => {
       if (cancelled) return;
-      setState({ status: 'ready', games: res.games, source: res.source, error: res.error || null });
+      setState({
+        status: 'ready',
+        games: res.games,
+        source: res.source,
+        error: res.error || null,
+        hasMore: !!res.hasMore,
+      });
+      // Scroll to the top of the grid for a clean "new page" feel.
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
     });
     return () => {
       cancelled = true;
     };
-  }, [limit]);
+  }, [page, pageSize]);
+
+  const goToPage = (n) => {
+    if (n < 1) return;
+    setPage(n);
+    const next = new URLSearchParams(searchParams);
+    if (n === 1) next.delete('page');
+    else next.set('page', String(n));
+    setSearchParams(next, { replace: false });
+  };
+
+  const startRank = (page - 1) * pageSize + 1;
 
   return (
     <section className="space-y-4">
       <header className="flex items-end justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Top {limit} on Steam right now</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Browse Steam — page {page}</h2>
           <p className="text-sm text-muted">
             Live from SteamSpy — sorted by current concurrent players. Click a cover to open the
             Steam page, or the <span className="font-mono">⋮</span> menu to add it to your library
@@ -88,7 +151,12 @@ export default function SteamTopGames({ limit = 50 }) {
         </div>
         <div className="text-xs text-muted">
           {state.status === 'loading' && 'Loading…'}
-          {state.status === 'ready' && state.source === 'steamspy' && 'Source: SteamSpy (live)'}
+          {state.status === 'ready' && state.source === 'backend' && (
+            <>Source: Lab 7 API proxy — page {page}</>
+          )}
+          {state.status === 'ready' && state.source === 'steamspy' && (
+            <>Source: SteamSpy (direct) — page {page}</>
+          )}
           {state.status === 'ready' && state.source === 'fallback' && (
             <span title={state.error || ''}>Source: bundled fallback</span>
           )}
@@ -97,20 +165,43 @@ export default function SteamTopGames({ limit = 50 }) {
 
       {state.status === 'loading' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: pageSize > 20 ? 20 : pageSize }).map((_, i) => (
             <div
               key={i}
               className="aspect-[460/280] rounded-lg bg-surface2 animate-pulse border border-border"
             />
           ))}
         </div>
+      ) : state.games.length === 0 ? (
+        <div className="p-8 rounded-lg border border-dashed border-border bg-surface text-center">
+          <div className="font-medium">No more games on this page.</div>
+          <div className="text-sm text-muted mt-1">
+            Go back to{' '}
+            <button
+              type="button"
+              onClick={() => goToPage(1)}
+              className="underline hover:text-text"
+            >
+              page 1
+            </button>
+            .
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {state.games.map((game, idx) => (
-            <GameTile key={game.appid} game={game} rank={idx + 1} />
+            <GameTile key={game.appid} game={game} rank={startRank + idx} />
           ))}
         </div>
       )}
+
+      <div className="flex items-center justify-between flex-wrap gap-3 pt-3">
+        <div className="text-xs text-muted">
+          Showing {state.games.length === 0 ? 0 : startRank}
+          {state.games.length > 0 && `–${startRank + state.games.length - 1}`}
+        </div>
+        <Paginator page={page} hasMore={state.hasMore} onChange={goToPage} />
+      </div>
     </section>
   );
 }

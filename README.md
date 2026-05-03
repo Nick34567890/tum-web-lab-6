@@ -88,3 +88,32 @@ No API key is required; the app is fully client-side.
 ## Link
 
 https://nick34567890.github.io/tum-web-lab-6/
+
+## Lab 7 integration (REST API + JWT)
+
+This client now also talks to the Lab 7 backend in `../tum-web-lab-7`.
+
+- API URL is read from `VITE_API_URL` (see `.env.example`); defaults to
+  `http://localhost:4000`.
+- A new top **AuthBar** shows API health, lets you pick a `ROLE`
+  (`ADMIN / WRITER / VISITOR`) and shows the JWT countdown (1 min).
+- `useGameLists` mirrors every mutation (`addTo*`, `update*`, `removeFrom*`,
+  `markGameAsPlayed`) to the REST API while keeping localStorage as an
+  offline cache, so the existing pages keep working with or without the
+  backend running.
+- On load and whenever the backend comes back online, the cache is
+  refreshed from the server (server is source of truth).
+
+To run both:
+
+```bash
+# terminal 1
+cd ../tum-web-lab-7 && npm install && npm start
+
+# terminal 2
+cd tum-web-lab-6 && npm install && npm run dev
+```
+
+Then open http://localhost:5173 and try changing the role to `VISITOR` —
+write attempts return `403` from the server (visible in DevTools
+console). Pick `ADMIN` again and writes succeed.

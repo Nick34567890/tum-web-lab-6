@@ -4,6 +4,7 @@ import Library from '../pages/Library.jsx';
 import Calendar from '../pages/Calendar.jsx';
 import Planner from '../pages/Planner.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import AuthBar from '../components/AuthBar.jsx';
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -43,6 +44,7 @@ export default function App() {
           <ThemeToggle />
         </div>
       </header>
+      <AuthBar />
 
       <main className="flex-1">
         <div className="max-w-6xl mx-auto px-6 py-8">

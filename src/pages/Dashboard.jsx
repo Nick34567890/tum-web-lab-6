@@ -10,7 +10,7 @@ export default function Dashboard() {
         </p>
       </header>
 
-      <SteamTopGames limit={50} />
+      <SteamTopGames pageSize={50} />
     </div>
   );
 }
