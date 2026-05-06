@@ -5,6 +5,7 @@ import Calendar from '../pages/Calendar.jsx';
 import Planner from '../pages/Planner.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import AuthBar from '../components/AuthBar.jsx';
+import GlobalToaster from '../components/GlobalToaster.jsx';
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -60,6 +61,8 @@ export default function App() {
       <footer className="border-t border-border text-muted text-xs py-4 text-center">
         Game Activity Tracker · client-side only · data stored in your browser
       </footer>
+
+      <GlobalToaster />
     </div>
   );
 }

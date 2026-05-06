@@ -11,9 +11,26 @@ const IDENTITY_KEY = 'gat-api-identity-v1';
 let identity = readIdentity();
 let cachedToken = null;
 let cachedExpiresAt = 0;
+let cachedPermissions = null;
 let inflightToken = null;
 let online = false;
 const subscribers = new Set();
+const errorSubscribers = new Set();
+
+const ROLE_PERMS = {
+  ADMIN: ['READ', 'WRITE', 'DELETE'],
+  WRITER: ['READ', 'WRITE'],
+  VISITOR: ['READ'],
+};
+
+function effectivePermissions() {
+  if (Array.isArray(cachedPermissions)) return cachedPermissions;
+  if (Array.isArray(identity.permissions) && identity.permissions.length) {
+    return identity.permissions.map((p) => String(p).toUpperCase());
+  }
+  const role = (identity.role || '').toUpperCase();
+  return ROLE_PERMS[role] ?? ROLE_PERMS.VISITOR;
+}
 
 function readIdentity() {
   try {
@@ -38,7 +55,7 @@ export function getStatus() {
     baseUrl: DEFAULT_BASE,
     online,
     role: identity.role,
-    permissions: identity.permissions,
+    permissions: effectivePermissions(),
     expiresAt: cachedExpiresAt,
     hasToken: !!cachedToken,
   };
@@ -50,11 +67,22 @@ export function subscribe(fn) {
   return () => subscribers.delete(fn);
 }
 
+export function subscribeErrors(fn) {
+  errorSubscribers.add(fn);
+  return () => errorSubscribers.delete(fn);
+}
+
+export function emitError(message, type = 'error') {
+  const toast = { id: Date.now() + Math.random(), message, type };
+  for (const fn of errorSubscribers) fn(toast);
+}
+
 export function setIdentity(next) {
   identity = { ...identity, ...next };
   writeIdentity();
   cachedToken = null;
   cachedExpiresAt = 0;
+  cachedPermissions = null;
   notify();
 }
 
@@ -81,6 +109,7 @@ async function getToken() {
     .then((data) => {
       cachedToken = data.token;
       cachedExpiresAt = data.expiresAt ?? now + 60_000;
+      cachedPermissions = Array.isArray(data.permissions) ? data.permissions : null;
       online = true;
       notify();
       return cachedToken;
@@ -88,6 +117,7 @@ async function getToken() {
     .catch((err) => {
       cachedToken = null;
       cachedExpiresAt = 0;
+      cachedPermissions = null;
       online = false;
       notify();
       throw err;
@@ -150,7 +180,7 @@ export async function ping() {
   return online;
 }
 
-const COLLECTIONS = ['library', 'planner', 'wishlist', 'history'];
+const COLLECTIONS = ['library', 'planner', 'wishlist', 'history', 'hidden'];
 
 async function listCollection(name, { limit = 200, offset = 0 } = {}) {
   const res = await authedFetch(`/api/${name}?limit=${limit}&offset=${offset}`);

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchDashboardPage } from '../api/steam.js';
 import { steamHeader, steamStorePage } from '../data/fallbackTopGames.js';
+import { useGameLists } from '../hooks/useGameLists.js';
+import { usePermissions } from '../hooks/usePermissions.js';
 import GameActionsMenu from './GameActionsMenu.jsx';
 
 function formatCcu(n) {
@@ -11,7 +13,7 @@ function formatCcu(n) {
   return String(n);
 }
 
-function GameTile({ game, rank }) {
+function GameTile({ game, rank, canDelete, onDelete }) {
   const [imgFailed, setImgFailed] = useState(false);
   return (
     <div className="group relative rounded-lg overflow-hidden bg-surface border border-border hover:border-accent transition-colors flex flex-col">
@@ -42,6 +44,20 @@ function GameTile({ game, rank }) {
           <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-semibold">
             FREE
           </div>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(game);
+            }}
+            title="Admin: remove this game from the dashboard"
+            className="absolute bottom-1.5 left-1.5 z-10 w-7 h-7 grid place-items-center rounded-md bg-red-600/90 hover:bg-red-700 text-white text-sm leading-none shadow-md"
+          >
+            🗑
+          </button>
         )}
       </a>
       <div className="px-3 py-2 flex-1 flex flex-col gap-0.5 relative">
@@ -106,6 +122,8 @@ export default function SteamTopGames({ pageSize = 50 }) {
   const initialPage = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1', 10) || 1);
   const [page, setPage] = useState(initialPage);
   const [state, setState] = useState({ status: 'loading', games: [], source: null, error: null, hasMore: false });
+  const { isHidden, hidden, hideFromDashboard, unhideFromDashboard } = useGameLists();
+  const { canDelete, role } = usePermissions();
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +155,7 @@ export default function SteamTopGames({ pageSize = 50 }) {
   };
 
   const startRank = (page - 1) * pageSize + 1;
+  const visibleGames = state.games.filter((g) => !isHidden(g.appid));
 
   return (
     <section className="space-y-4">
@@ -148,6 +167,18 @@ export default function SteamTopGames({ pageSize = 50 }) {
             Steam page, or the <span className="font-mono">⋮</span> menu to add it to your library
             or plans.
           </p>
+          {canDelete && hidden.length > 0 && (
+            <p className="text-xs text-amber-400 mt-1">
+              Admin: {hidden.length} game{hidden.length === 1 ? '' : 's'} hidden from dashboard.{' '}
+              <button
+                type="button"
+                onClick={() => hidden.forEach((g) => unhideFromDashboard(g.appid))}
+                className="underline hover:text-amber-300"
+              >
+                Restore all
+              </button>
+            </p>
+          )}
         </div>
         <div className="text-xs text-muted">
           {state.status === 'loading' && 'Loading…'}
@@ -172,7 +203,7 @@ export default function SteamTopGames({ pageSize = 50 }) {
             />
           ))}
         </div>
-      ) : state.games.length === 0 ? (
+      ) : visibleGames.length === 0 ? (
         <div className="p-8 rounded-lg border border-dashed border-border bg-surface text-center">
           <div className="font-medium">No more games on this page.</div>
           <div className="text-sm text-muted mt-1">
@@ -189,16 +220,30 @@ export default function SteamTopGames({ pageSize = 50 }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {state.games.map((game, idx) => (
-            <GameTile key={game.appid} game={game} rank={startRank + idx} />
+          {visibleGames.map((game, idx) => (
+            <GameTile
+              key={game.appid}
+              game={game}
+              rank={startRank + state.games.findIndex((g) => g.appid === game.appid)}
+              canDelete={canDelete}
+              onDelete={(g) => {
+                if (!canDelete) return;
+                if (window.confirm(`Hide "${g.name}" from the dashboard?\n\n(Admin-only action — only ${role || 'ADMIN'} can do this.)`)) {
+                  hideFromDashboard(g);
+                }
+              }}
+            />
           ))}
         </div>
       )}
 
       <div className="flex items-center justify-between flex-wrap gap-3 pt-3">
         <div className="text-xs text-muted">
-          Showing {state.games.length === 0 ? 0 : startRank}
-          {state.games.length > 0 && `–${startRank + state.games.length - 1}`}
+          Showing {visibleGames.length === 0 ? 0 : startRank}
+          {visibleGames.length > 0 && `–${startRank + visibleGames.length - 1}`}
+          {state.games.length !== visibleGames.length && (
+            <span className="ml-1">({state.games.length - visibleGames.length} hidden)</span>
+          )}
         </div>
         <Paginator page={page} hasMore={state.hasMore} onChange={goToPage} />
       </div>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useGameLists } from '../hooks/useGameLists.js';
+import { usePermissions } from '../hooks/usePermissions.js';
 import { steamHeader, steamStorePage } from '../data/fallbackTopGames.js';
 
 export default function Library() {
   const { library, planner, removeFromLibrary, addToPlanner, updatePlannerGame, inPlanner } = useGameLists();
+  const { canWrite, canDelete, role } = usePermissions();
   const [scheduleGame, setScheduleGame] = useState(null);
   const [scheduledDateTime, setScheduledDateTime] = useState('');
 
@@ -39,6 +41,12 @@ export default function Library() {
         </p>
       </header>
 
+      {!canWrite && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+          You're signed in as <span className="font-semibold">{role || 'VISITOR'}</span> — read-only mode. Switch role in the top bar to add, edit, or remove games.
+        </div>
+      )}
+
       {library.length === 0 ? (
         <EmptyState
           title="Your library is empty"
@@ -51,17 +59,19 @@ export default function Library() {
               key={g.appid}
               className="rounded-lg border border-border bg-surface overflow-hidden flex relative"
             >
-              <button
-                type="button"
-                onClick={() => openSchedule(g)}
-                className={`absolute top-2 right-2 z-10 rounded-md px-2 py-1 text-[10px] font-semibold shadow-md transition ${
-                  inPlanner(g.appid)
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {inPlanner(g.appid) ? '✓ Planned' : 'Plan play'}
-              </button>
+              {canWrite && (
+                <button
+                  type="button"
+                  onClick={() => openSchedule(g)}
+                  className={`absolute top-2 right-2 z-10 rounded-md px-2 py-1 text-[10px] font-semibold shadow-md transition ${
+                    inPlanner(g.appid)
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {inPlanner(g.appid) ? '✓ Planned' : 'Plan play'}
+                </button>
+              )}
               <a
                 href={steamStorePage(g.appid)}
                 target="_blank"
@@ -77,15 +87,17 @@ export default function Library() {
               <div className="flex-1 p-3 flex flex-col">
                 <div className="font-medium text-sm line-clamp-1">{g.name}</div>
                 <div className="text-[11px] text-muted">{g.developer}</div>
-                <div className="mt-auto pt-2">
-                  <button
-                    type="button"
-                    onClick={() => removeFromLibrary(g.appid)}
-                    className="text-[11px] text-muted hover:text-text"
-                  >
-                    Remove
-                  </button>
-                </div>
+                {canDelete && (
+                  <div className="mt-auto pt-2">
+                    <button
+                      type="button"
+                      onClick={() => removeFromLibrary(g.appid)}
+                      className="text-[11px] text-muted hover:text-text"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

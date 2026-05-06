@@ -7,12 +7,12 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
 const SEED_PATH = path.join(DATA_DIR, 'seed.json');
 
-export const COLLECTIONS = ['library', 'planner', 'wishlist', 'history'];
+export const COLLECTIONS = ['library', 'planner', 'wishlist', 'history', 'hidden'];
 
 let cache = null;
 let writePromise = Promise.resolve();
 
-const empty = () => ({ library: [], planner: [], wishlist: [], history: [] });
+const empty = () => ({ library: [], planner: [], wishlist: [], history: [], hidden: [] });
 
 async function ensureLoaded() {
   if (cache) return cache;

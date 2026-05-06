@@ -2,14 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   createEntry,
   deleteEntry,
+  emitError,
   fetchAllCollections,
   subscribe as subscribeBackend,
   updateEntry,
 } from '../api/backend.js';
 
+function describePermissionError(err, action) {
+  const granted = err?.body?.granted;
+  const grantedText = Array.isArray(granted) && granted.length ? granted.join(', ') : 'none';
+  return `Cannot ${action}: your role only has ${grantedText} permission.`;
+}
+
 const KEY = 'gat-lists-v1';
 
-const empty = () => ({ library: [], planner: [], wishlist: [], history: [] });
+const empty = () => ({ library: [], planner: [], wishlist: [], history: [], hidden: [] });
 
 function read() {
   try {
@@ -21,6 +28,7 @@ function read() {
       planner: Array.isArray(parsed.planner) ? parsed.planner : [],
       wishlist: Array.isArray(parsed.wishlist) ? parsed.wishlist : [],
       history: Array.isArray(parsed.history) ? parsed.history : [],
+      hidden: Array.isArray(parsed.hidden) ? parsed.hidden : [],
     };
   } catch {
     return empty();
@@ -49,6 +57,7 @@ function applyServerState(server) {
     planner: server.planner ?? cache.planner,
     wishlist: server.wishlist ?? cache.wishlist,
     history: server.history ?? cache.history,
+    hidden: server.hidden ?? cache.hidden,
   };
   persistLocal(next);
 }
@@ -93,11 +102,19 @@ async function upsert(listName, game, overrides = {}) {
   const list = cache[listName];
   if (list.some((g) => g.appid === game.appid)) return;
   const entry = buildEntry(game, overrides);
+  const prevCache = cache;
   persistLocal({ ...cache, [listName]: [...list, entry] });
   try {
     await createEntry(listName, entry);
   } catch (err) {
     if (err?.status === 409) return; // server already has it — fine
+    if (err?.status === 403) {
+      persistLocal(prevCache);
+      emitError(describePermissionError(err, `add to ${listName}`));
+      return;
+    }
+    persistLocal(prevCache);
+    emitError(`Could not add to ${listName}: ${err.message}`);
     console.warn(`[lab7] createEntry(${listName}) failed:`, err.message);
   }
 }
@@ -109,10 +126,18 @@ async function updateInList(listName, appid, updates) {
   const updated = { ...list[index], ...updates };
   const newList = [...list];
   newList[index] = updated;
+  const prevCache = cache;
   persistLocal({ ...cache, [listName]: newList });
   try {
     await updateEntry(listName, appid, updates);
   } catch (err) {
+    if (err?.status === 403) {
+      persistLocal(prevCache);
+      emitError(describePermissionError(err, `edit ${listName} entry`));
+      return;
+    }
+    persistLocal(prevCache);
+    emitError(`Could not update ${listName}: ${err.message}`);
     console.warn(`[lab7] updateEntry(${listName}) failed:`, err.message);
   }
 }
@@ -120,10 +145,18 @@ async function updateInList(listName, appid, updates) {
 async function removeFrom(listName, appid) {
   const list = cache[listName];
   if (!list.some((g) => g.appid === appid)) return;
+  const prevCache = cache;
   persistLocal({ ...cache, [listName]: list.filter((g) => g.appid !== appid) });
   try {
     await deleteEntry(listName, appid);
   } catch (err) {
+    if (err?.status === 403) {
+      persistLocal(prevCache);
+      emitError(describePermissionError(err, `remove from ${listName}`));
+      return;
+    }
+    persistLocal(prevCache);
+    emitError(`Could not remove from ${listName}: ${err.message}`);
     console.warn(`[lab7] deleteEntry(${listName}) failed:`, err.message);
   }
 }
@@ -143,14 +176,21 @@ async function moveToHistory(appid, payload = {}) {
     durationMinutes,
   };
   const newPlanner = list.filter((g) => g.appid !== appid);
+  const prevCache = cache;
   persistLocal({ ...cache, planner: newPlanner, history: [...cache.history, game] });
   try {
     await deleteEntry('planner', appid);
     await createEntry('history', game);
   } catch (err) {
-    if (err?.status !== 409) {
-      console.warn('[lab7] moveToHistory sync failed:', err.message);
+    if (err?.status === 409) return;
+    if (err?.status === 403) {
+      persistLocal(prevCache);
+      emitError(describePermissionError(err, 'mark as played'));
+      return;
     }
+    persistLocal(prevCache);
+    emitError(`Could not mark as played: ${err.message}`);
+    console.warn('[lab7] moveToHistory sync failed:', err.message);
   }
 }
 
@@ -165,15 +205,18 @@ export function useGameLists() {
   const inLibrary = useCallback((appid) => state.library.some((g) => g.appid === appid), [state]);
   const inPlanner = useCallback((appid) => state.planner.some((g) => g.appid === appid), [state]);
   const inWishlist = useCallback((appid) => state.wishlist.some((g) => g.appid === appid), [state]);
+  const isHidden = useCallback((appid) => state.hidden.some((g) => g.appid === appid), [state]);
 
   return {
     library: state.library,
     planner: state.planner,
     wishlist: state.wishlist,
     history: state.history,
+    hidden: state.hidden,
     inLibrary,
     inPlanner,
     inWishlist,
+    isHidden,
     addToLibrary: (game, overrides) => upsert('library', game, overrides),
     addToPlanner: (game, overrides) => upsert('planner', game, overrides),
     addToWishlist: (game, overrides) => upsert('wishlist', game, overrides),
@@ -183,5 +226,7 @@ export function useGameLists() {
     updatePlannerGame: (appid, updates) => updateInList('planner', appid, updates),
     updateWishlistGame: (appid, updates) => updateInList('wishlist', appid, updates),
     markGameAsPlayed: (appid, payload) => moveToHistory(appid, payload),
+    hideFromDashboard: (game) => upsert('hidden', game),
+    unhideFromDashboard: (appid) => removeFrom('hidden', appid),
   };
 }

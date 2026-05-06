@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useGameLists } from '../hooks/useGameLists.js';
+import { usePermissions } from '../hooks/usePermissions.js';
 import { useNotification } from '../hooks/useNotification.js';
 import { useNotificationChecker } from '../hooks/useNotificationChecker.js';
 import { steamHeader, steamStorePage } from '../data/fallbackTopGames.js';
@@ -9,6 +10,7 @@ import MarkPlayedModal from '../components/MarkPlayedModal.jsx';
 
 export default function Planner() {
   const { library, planner, wishlist, removeFromPlanner, removeFromWishlist, updatePlannerGame, updateWishlistGame, inLibrary, addToLibrary, markGameAsPlayed } = useGameLists();
+  const { canWrite, canDelete, role } = usePermissions();
   const { notifications, addNotification, removeNotification } = useNotification();
   const [editingGame, setEditingGame] = useState(null);
   const [editingListType, setEditingListType] = useState(null);
@@ -49,9 +51,17 @@ export default function Planner() {
         </p>
       </header>
 
+      {!canWrite && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+          You're signed in as <span className="font-semibold">{role || 'VISITOR'}</span> — read-only mode. Switch role in the top bar to edit or remove planned games.
+        </div>
+      )}
+
       <Section
         title="Plan to play"
         items={planner}
+        canWrite={canWrite}
+        canDelete={canDelete}
         onRemove={removeFromPlanner}
         onEdit={(game) => handleEdit(game, 'planner')}
         onDone={(game) => setDonePromptGame(game)}
@@ -61,6 +71,8 @@ export default function Planner() {
       <Section
         title="Plan to buy"
         items={wishlist}
+        canWrite={canWrite}
+        canDelete={canDelete}
         onRemove={removeFromWishlist}
         onEdit={(game) => handleEdit(game, 'wishlist')}
         onBuy={(game) => setBuyPromptGame(game)}
@@ -109,7 +121,7 @@ export default function Planner() {
   );
 }
 
-function Section({ title, items, onRemove, onEdit, onDone, onBuy, emptyHint }) {
+function Section({ title, items, canWrite, canDelete, onRemove, onEdit, onDone, onBuy, emptyHint }) {
   return (
     <section className="space-y-3">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
@@ -156,14 +168,16 @@ function Section({ title, items, onRemove, onEdit, onDone, onBuy, emptyHint }) {
                 </div>
 
                 <div className="mt-auto pt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(g)}
-                    className="flex-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded transition"
-                  >
-                    Edit
-                  </button>
-                  {title === 'Plan to play' && onDone && (
+                  {canWrite && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(g)}
+                      className="flex-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded transition"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  {canWrite && canDelete && title === 'Plan to play' && onDone && (
                     <button
                       type="button"
                       onClick={() => onDone(g)}
@@ -172,7 +186,7 @@ function Section({ title, items, onRemove, onEdit, onDone, onBuy, emptyHint }) {
                       Done
                     </button>
                   )}
-                  {title === 'Plan to buy' && onBuy && (
+                  {canWrite && title === 'Plan to buy' && onBuy && (
                     <button
                       type="button"
                       onClick={() => onBuy(g)}
@@ -181,13 +195,20 @@ function Section({ title, items, onRemove, onEdit, onDone, onBuy, emptyHint }) {
                       Buy
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onRemove(g.appid)}
-                    className="flex-1 text-[11px] text-muted hover:text-red-400 px-2 py-1.5 rounded hover:bg-red-500/10 transition"
-                  >
-                    Remove
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onRemove(g.appid)}
+                      className="flex-1 text-[11px] text-muted hover:text-red-400 px-2 py-1.5 rounded hover:bg-red-500/10 transition"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {!canWrite && !canDelete && (
+                    <div className="flex-1 text-[11px] text-muted italic px-2 py-1.5">
+                      Read-only
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

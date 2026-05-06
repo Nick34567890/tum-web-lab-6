@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameLists } from '../hooks/useGameLists.js';
+import { usePermissions } from '../hooks/usePermissions.js';
 
 export default function GameActionsMenu({ game }) {
   const [open, setOpen] = useState(false);
   const [buyPromptOpen, setBuyPromptOpen] = useState(false);
   const wrapRef = useRef(null);
   const navigate = useNavigate();
+  const { canWrite, role } = usePermissions();
   const {
     inLibrary,
     inPlanner,
@@ -29,6 +31,18 @@ export default function GameActionsMenu({ game }) {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  if (!canWrite) {
+    return (
+      <div
+        className="w-7 h-7 grid place-items-center rounded-md bg-black/40 text-white/60 text-[10px] leading-none cursor-not-allowed"
+        title={`Read-only (${role || 'VISITOR'} cannot modify lists)`}
+        onClick={(e) => e.preventDefault()}
+      >
+        🔒
+      </div>
+    );
+  }
 
   const stop = (e) => {
     e.preventDefault();
